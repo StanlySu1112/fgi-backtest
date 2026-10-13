@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>恐懼與貪婪指數 (FGI) 智慧回測戰情室 PRO</title>
+    <!-- Chart.js 視覺化圖表庫 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-color: #0b1120;
+            --card-bg: #152238;
+            --panel-bg: #0f172a;
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --accent: #38bdf8;
+            --accent-glow: rgba(56, 189, 248, 0.25);
+            --success: #10b981;
+            --danger: #f43f5e;
+            --warning: #f59e0b;
+            --border: #334155;
+            --gold: #fbbf24;
+        }
+
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans TC", sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+        }
+
+        /* 頂部 Header & 即時指標橫幅 */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border);
+        }
+        .header-title {
+            font-size: 1.8rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin: 0;
+        }
+        .fgi-banner {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            padding: 8px 18px;
+            border-radius: 9999px;
+            font-size: 0.95rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        .fgi-badge {
+            font-weight: 800;
+            padding: 3px 10px;
+            border-radius: 9999px;
+            color: #000;
+            background: var(--accent);
+        }
+
+        /* 控制面板 */
+        .controls-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+            margin-bottom: 30px;
+        }
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+        }
+        .input-group {
+            display: flex;
+            flex-direction: column;
+        }
+        label {
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--text-muted);
+            font-size: 0.88rem;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        input[type="number"], input[type="date"], select, textarea {
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            color: white;
+            padding: 10px 14px;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+        input:focus, select:focus, textarea:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+        textarea {
+            resize: vertical;
+            height: 60px;
+        }
+
+        /* 標籤按鈕 */
+        .chip-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .chip {
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            color: #cbd5e1;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            user-select: none;
+        }
+        .chip:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: rgba(56, 189, 248, 0.1);
+        }
+
+        /* 預設區間快捷鈕 */
+        .preset-btn {
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .preset-btn:hover {
+            background: var(--border);
+            color: white;
+        }
+
+        /* 核取方塊自訂外觀 */
+        .checkbox-group {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .checkbox-btn { display: none; }
+        .checkbox-label {
+            padding: 8px 16px;
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: 0.2s;
+            user-select: none;
+            font-size: 0.9rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .checkbox-btn:checked + .checkbox-label {
+            background: rgba(56, 189, 248, 0.15);
+            border-color: var(--accent);
+            color: var(--accent);
+            font-weight: 700;
+        }
+
+        .fgi-subpanel {
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 15px;
+            margin-top: 12px;
+        }
+
+        /* 開始按鈕 */
+        .btn-run {
+            grid-column: 1 / -1;
+            background: linear-gradient(135deg, #0284c7, #2563eb);
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 12px;
+            font-size: 1.15rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 15px rgba(37, 99, 235, 0.35);
+            margin-top: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+        }
+        .btn-run:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(37, 99, 235, 0.5);
+        }
+        .btn-run:disabled {
+            background: #475569;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        /* 載入狀態 */
+        .loader {
+            display: none;
+            text-align: center;
+            padding: 40px;
+            font-size: 1.1rem;
+            color: var(--accent);
+        }
+        .spinner {
+            display: inline-block;
+            width: 32px;
+            height: 32px;
+            border: 3px solid rgba(56, 189, 248, 0.3);
+            border-radius: 50%;
+            border-top-color: var(--accent);
+            animation: spin 1s ease-in-out infinite;
+            margin-bottom: 12px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* 綜合天梯排行榜 */
+        .leaderboard-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 30px;
+            overflow-x: auto;
+        }
+        .leaderboard-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.92rem;
+            min-width: 650px;
+        }
+        .leaderboard-table th {
+            background: var(--panel-bg);
+            color: var(--accent);
+            padding: 12px;
+            text-align: left;
+            border-bottom: 2px solid var(--border);
+        }
+        .leaderboard-table td {
+            padding: 12px;
+            border-bottom: 1px solid rgba(51, 65, 85, 0.6);
+        }
+        .leaderboard-table tr:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        /* 股票卡片 */
+        .stock-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+            margin-bottom: 35px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
+        }
+        .card-header {
+            background: rgba(30, 41, 59, 0.8);
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+        }
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .card-body {
+            padding: 24px;
+        }
+
+        /* 統計指標格子 */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 18px;
+            margin-bottom: 25px;
+        }
+        .stat-box {
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 18px;
+            position: relative;
+            transition: all 0.2s;
+        }
+        .stat-box.winner {
+            border-color: var(--success);
+            background: linear-gradient(180deg, rgba(16, 185, 129, 0.05) 0%, var(--panel-bg) 100%);
+        }
+        .winner-tag {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: var(--success);
+            color: #000;
+            font-weight: 800;
+            font-size: 0.72rem;
+            padding: 2px 8px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .stat-strat-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 10px;
+        }
+        .stat-main-value {
+            font-size: 1.6rem;
+            font-weight: 800;
+            margin-bottom: 12px;
+        }
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+        .stat-row strong {
+            color: var(--text-main);
+        }
+
+        .btn-details {
+            background: var(--border);
+            color: var(--text-main);
+            border: none;
+            padding: 7px 12px;
+            border-radius: 8px;
+            font-size: 0.82rem;
+            cursor: pointer;
+            margin-top: 12px;
+            width: 100%;
+            font-weight: 600;
+            transition: 0.2s;
+        }
+        .btn-details:hover {
+            background: #475569;
+            color: white;
+        }
+
+        /* 圖表區塊 */
+        .chart-wrapper {
+            position: relative;
+            height: 380px;
+            width: 100%;
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 15px;
+        }
+
+        /* 彈窗 Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(4px);
+        }
+        .modal-content {
+            background: var(--card-bg);
+            margin: 3% auto;
+            padding: 24px;
+            border: 1px solid var(--border);
+            width: 85%;
+            max-width: 950px;
+            max-height: 85vh;
+            overflow-y: auto;
+            border-radius: 16px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 12px;
+            margin-bottom: 16px;
+        }
+        .close-btn {
+            font-size: 26px;
+            color: var(--text-muted);
+            cursor: pointer;
+            line-height: 1;
+        }
+        .close-btn:hover { color: white; }
+
+        .modal-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .btn-export {
+            background: #0284c7;
+            color: white;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .btn-export:hover { background: #0369a1; }
+
+        .filter-btn {
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-size: 0.82rem;
+            cursor: pointer;
+        }
+        .filter-btn.active {
+            background: var(--accent);
+            color: #000;
+            font-weight: 700;
+            border-color: var(--accent);
+        }
+
+        .trades-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.88rem;
+        }
+        .trades-table th {
+            background: var(--panel-bg);
+            color: var(--accent);
+            padding: 10px;
+            border: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+        }
+        .trades-table td {
+            padding: 10px;
+            border: 1px solid var(--border);
+        }
+        .trades-table tr:nth-child(even) {
+            background: rgba(255, 255, 255, 0.015);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- 頂部資訊與 FGI 即時狀態 -->
+    <header class="header">
+        <div>
+            <h1 class="header-title">📈 恐懼與貪婪指數 (FGI) 智慧回測戰情室 PRO</h1>
+            <div style="font-size:0.88rem; color:var(--text-muted); margin-top:4px;">
+                結合歷史情緒週期 × 定期定額 (DCA) × 真實交易手續費與稅金精算
+            </div>
+        </div>
+        <div class="fgi-banner" id="fgiBanner">
+            <span>🌍 市場情緒即時指針:</span>
+            <span class="fgi-badge" id="fgiValBadge">載入中...</span>
+            <span id="fgiDateText" style="color:var(--text-muted); font-size:0.8rem;"></span>
+        </div>
+    </header>
+
+    <!-- 控制面版 -->
+    <section class="controls-card">
+        <div class="controls-grid">
+            <!-- 資金設定 -->
+            <div class="input-group">
+                <label>💰 初始本金</label>
+                <input type="number" id="initCapital" value="100000" step="10000">
+            </div>
+            <div class="input-group">
+                <label>💸 每月投入 (薪水加碼)</label>
+                <input type="number" id="monthlyAdd" value="10000" step="1000">
+            </div>
+
+            <!-- 時間區間 -->
+            <div class="input-group">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <label>📅 開始日期</label>
+                    <div style="display:flex; gap:4px;">
+                        <button class="preset-btn" onclick="setDatePreset(3)">近3年</button>
+                        <button class="preset-btn" onclick="setDatePreset(5)">近5年</button>
+                        <button class="preset-btn" onclick="setDatePreset(10)">近10年</button>
+                        <button class="preset-btn" onclick="setDatePreset(0)">歷史全部</button>
+                    </div>
+                </div>
+                <input type="date" id="startDate" value="2011-01-03">
+            </div>
+            <div class="input-group">
+                <label>📅 結束日期</label>
+                <input type="date" id="endDate" value="2026-10-13">
+            </div>
+
+            <!-- 幣別與交易成本 -->
+            <div class="input-group">
+                <label>💱 計價幣別</label>
+                <select id="currency">
+                    <option value="NT$">新台幣 (TWD / NT$)</option>
+                    <option value="$">美金 (USD / $)</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label>⚖️ 交易成本設定</label>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="discount" class="checkbox-btn" checked>
+                    <label for="discount" class="checkbox-label">✓ 券商手續費 6 折 (0.0855%)</label>
+                </div>
+                <small style="color:#64748b; margin-top:6px;">自動精算台股/美股 ETF (0.1%) 及一般股票 (0.3%) 證交稅</small>
+            </div>
+
+            <!-- 策略選擇 -->
+            <div class="input-group" style="grid-column: span 2;">
+                <label>🧠 交易策略對決</label>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="strat_dca" class="checkbox-btn" value="DCA" checked>
+                    <label for="strat_dca" class="checkbox-label">📊 定期定額 (DCA)</label>
+                    
+                    <input type="checkbox" id="strat_fgi" class="checkbox-btn" value="FGI" checked onchange="toggleFgiMainSettings()">
+                    <label for="strat_fgi" class="checkbox-label">🔥 FGI 恐懼貪婪混合戰法</label>
+                </div>
+
+                <div id="fgiMainSettingsBox" class="fgi-subpanel">
+                    <div style="display:flex; gap:20px; align-items:center;">
+                        <label style="color:#e2e8f0; margin:0; cursor:pointer;">
+                            <input type="radio" name="fgiMode" value="auto" checked onchange="toggleFgiMode()"> 🤖 暴力尋找最佳買賣門檻
+                        </label>
+                        <label style="color:#e2e8f0; margin:0; cursor:pointer;">
+                            <input type="radio" name="fgiMode" value="manual" onchange="toggleFgiMode()"> ✍️ 自訂固定門檻
+                        </label>
+                    </div>
+                    <div id="manualParams" style="display:none; margin-top:12px; gap:15px; align-items:center;">
+                        <span>恐慌買入 (FGI &lt; ):</span>
+                        <input type="number" id="manualBuy" value="20" min="5" max="50" style="width:75px; padding:6px;">
+                        <span style="margin-left:10px;">貪婪賣出 (FGI &gt; ):</span>
+                        <input type="number" id="manualSell" value="80" min="50" max="95" style="width:75px; padding:6px;">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 投資標的輸入與熱門 Chip -->
+            <div class="input-group" style="grid-column: 1 / -1;">
+                <label>🎯 投資標的 (輸入中文股票名或代號，用逗號隔開)</label>
+                <textarea id="tickers">0050, 台積電, SPY</textarea>
+                <div class="chip-container">
+                    <span style="color:var(--text-muted); font-size:0.8rem; align-self:center;">快速加入：</span>
+                    <span class="chip" onclick="addTicker('0050')">+ 0050 (元大台灣50)</span>
+                    <span class="chip" onclick="addTicker('0056')">+ 0056 (元大高股息)</span>
+                    <span class="chip" onclick="addTicker('00878')">+ 00878 (國泰永續高股息)</span>
+                    <span class="chip" onclick="addTicker('00919')">+ 00919 (群益台灣精選高息)</span>
+                    <span class="chip" onclick="addTicker('台積電')">+ 台積電 (2330)</span>
+                    <span class="chip" onclick="addTicker('鴻海')">+ 鴻海 (2317)</span>
+                    <span class="chip" onclick="addTicker('聯發科')">+ 聯發科 (2454)</span>
+                    <span class="chip" onclick="addTicker('SPY')">+ SPY (美股大盤)</span>
+                    <span class="chip" onclick="addTicker('QQQ')">+ QQQ (那斯達克)</span>
+                    <span class="chip" onclick="addTicker('NVDA')">+ NVDA (輝達)</span>
+                    <span class="chip" onclick="addTicker('TSLA')">+ TSLA (特斯拉)</span>
+                </div>
+            </div>
+
+            <button class="btn-run" onclick="runBacktest()">
+                <span>🚀 開始精算回測</span>
+            </button>
+        </div>
+    </section>
+
+    <!-- 載入動畫 -->
+    <div id="loader" class="loader">
+        <div class="spinner"></div>
+        <div id="loaderText">正在準備數據與計算中...</div>
+    </div>
+
+    <!-- 綜合天梯排行榜 -->
+    <div id="leaderboardArea"></div>
+
+    <!-- 股票個別結果呈現區 -->
+    <div id="resultsArea"></div>
+</div>
+
+<!-- 交易明細彈窗 Modal -->
+<div id="tradeModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="modalTitle" style="margin:0; color:var(--accent);">📜 詳細交易流水帳</h3>
+            <span class="close-btn" onclick="closeModal()">&times;</span>
+        </div>
+        <div class="modal-actions">
+            <div style="display:flex; gap:8px;">
+                <button class="filter-btn active" onclick="filterModalTrades('all')">全部交易</button>
+                <button class="filter-btn" onclick="filterModalTrades('buy')">買進紀錄</button>
+                <button class="filter-btn" onclick="filterModalTrades('sell')">賣出紀錄</button>
+            </div>
+            <button class="btn-export" onclick="exportTradesToCSV()">📥 匯出 CSV</button>
+        </div>
+        <div id="modalSummary" style="margin-bottom:12px; color:var(--text-muted); font-size:0.9rem;"></div>
+        <div id="modalBody"></div>
+    </div>
+</div>
+
+<script>
+    const API_BASE = (window.location.protocol === 'file:') ? 'http://127.0.0.1:5000' : '';
+    let globalTradeLogs = {};
+    let currentModalLogKey = '';
+    let currentFilterType = 'all';
+
+    // 頁面加載完成時自動查詢當前市場 FGI
+    window.addEventListener('DOMContentLoaded', async () => {
+        // 設定結束日期為今日
+        const todayStr = new Date().toISOString().split('T')[0];
+        document.getElementById('endDate').value = todayStr;
+
+        try {
+            const resp = await fetch(`${API_BASE}/api/fgi/latest`);
+            if (resp.ok) {
+                const fgi = await resp.json();
+                const badge = document.getElementById('fgiValBadge');
+                badge.innerText = `${fgi.value} 分 (${fgi.category})`;
+                
+                // 根據數值著色
+                if (fgi.value <= 25) badge.style.background = '#f43f5e';
+                else if (fgi.value <= 45) badge.style.background = '#fb923c';
+                else if (fgi.value <= 55) badge.style.background = '#facc15';
+                else if (fgi.value <= 75) badge.style.background = '#38bdf8';
+                else badge.style.background = '#4ade80';
+
+                document.getElementById('fgiDateText').innerText = `[${fgi.date}]`;
+            }
+        } catch (e) {
+            document.getElementById('fgiValBadge').innerText = "離線狀態";
+        }
+    });
+
+    function toggleFgiMainSettings() {
+        const checked = document.getElementById('strat_fgi').checked;
+        document.getElementById('fgiMainSettingsBox').style.display = checked ? 'block' : 'none';
+    }
+
+    function toggleFgiMode() {
+        const isManual = document.querySelector('input[name="fgiMode"]:checked').value === 'manual';
+        document.getElementById('manualParams').style.display = isManual ? 'flex' : 'none';
+    }
+
+    function addTicker(ticker) {
+        const textarea = document.getElementById('tickers');
+        const list = textarea.value.split(/[,，\n]+/).map(t => t.trim()).filter(t => t);
+        if (!list.includes(ticker)) {
+            list.push(ticker);
+            textarea.value = list.join(', ');
+        }
+    }
+
+    function setDatePreset(yearsAgo) {
+        const endInput = document.getElementById('endDate');
+        const startInput = document.getElementById('startDate');
+        const today = new Date();
+        endInput.value = today.toISOString().split('T')[0];
+
+        if (yearsAgo === 0) {
+            startInput.value = '2011-01-03';
+        } else {
+            const startDate = new Date();
+            startDate.setFullYear(today.getFullYear() - yearsAgo);
+            startInput.value = startDate.toISOString().split('T')[0];
+        }
+    }
+
+    async function runBacktest() {
+        const btn = document.querySelector('.btn-run');
+        const loader = document.getElementById('loader');
+        const loaderText = document.getElementById('loaderText');
+        const leaderboardArea = document.getElementById('leaderboardArea');
+        const resultsArea = document.getElementById('resultsArea');
+
+        const tickersRaw = document.getElementById('tickers').value;
+        const tickers = tickersRaw.split(/[,，\n]+/).map(t => t.trim()).filter(t => t);
+
+        const strategies = [];
+        if (document.getElementById('strat_dca').checked) strategies.push('DCA');
+        if (document.getElementById('strat_fgi').checked) strategies.push('FGI');
+
+        if (tickers.length === 0) {
+            alert('請至少輸入一檔投資標的！');
+            return;
+        }
+        if (strategies.length === 0) {
+            alert('請至少勾選一種交易策略！');
+            return;
+        }
+
+        const payload = {
+            initial: parseFloat(document.getElementById('initCapital').value) || 0,
+            monthly: parseFloat(document.getElementById('monthlyAdd').value) || 0,
+            startDate: document.getElementById('startDate').value,
+            endDate: document.getElementById('endDate').value,
+            discount: document.getElementById('discount').checked,
+            tickers: tickers,
+            strategies: strategies,
+            isAutoFgi: document.querySelector('input[name="fgiMode"]:checked').value === 'auto',
+            manualBuy: parseInt(document.getElementById('manualBuy').value),
+            manualSell: parseInt(document.getElementById('manualSell').value)
+        };
+        const currency = document.getElementById('currency').value;
+
+        btn.disabled = true;
+        loaderText.innerText = (strategies.includes('FGI') && payload.isAutoFgi)
+            ? '⚡ 正在載入真實交易日數據並暴力搜尋最佳買賣點...'
+            : '⏳ 正在套用參數精算回測與扣除稅費中...';
+        loader.style.display = 'block';
+        leaderboardArea.innerHTML = '';
+        resultsArea.innerHTML = '';
+        globalTradeLogs = {};
+
+        try {
+            const resp = await fetch(`${API_BASE}/api/backtest`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!resp.ok) {
+                const errData = await resp.json().catch(() => ({}));
+                throw new Error(errData.error || `伺服器回應錯誤 (${resp.status})`);
+            }
+
+            const data = await resp.json();
+            if (!data || data.length === 0) {
+                resultsArea.innerHTML = `<div style="text-align:center; padding:40px; color:#f87171;">⚠️ 未查得任何有效數據，請確認標的代號或日期區間！</div>`;
+                return;
+            }
+
+            renderLeaderboard(data, currency);
+            renderStockCards(data, currency);
+
+        } catch (error) {
+            resultsArea.innerHTML = `
+                <div style="background:#451a1a; border:1px solid #7f1d1d; border-radius:12px; padding:20px; text-align:center; margin-top:20px;">
+                    <h3 style="color:#f87171; margin-top:0;">❌ 連線或運算失敗</h3>
+                    <p style="color:#fca5a5;">${error.message}</p>
+                    <p style="font-size:0.85rem; color:#cbd5e1;">請確認後端伺服器 (server.py) 是否正在執行中 (網址 http://127.0.0.1:5000)</p>
+                </div>
+            `;
+        } finally {
+            btn.disabled = false;
+            loader.style.display = 'none';
+        }
+    }
+
+    function renderLeaderboard(data, currency) {
+        const container = document.getElementById('leaderboardArea');
+        if (data.length <= 1 && data[0].strategies.length <= 1) return;
+
+        let rowsHtml = '';
+        data.forEach(stock => {
+            let bestStrat = stock.strategies.reduce((prev, curr) => (prev.final_value > curr.final_value) ? prev : curr);
+            let dcaStrat = stock.strategies.find(s => s.type.includes('DCA'));
+            let fgiStrat = stock.strategies.find(s => s.type.includes('FGI'));
+
+            let winnerBadge = '⚖️ 平手';
+            let diffHtml = '-';
+            if (dcaStrat && fgiStrat) {
+                const diff = fgiStrat.final_value - dcaStrat.final_value;
+                if (diff > 0) {
+                    winnerBadge = '<span style="color:#10b981; font-weight:bold;">👑 FGI 獲勝</span>';
+                    diffHtml = `<span style="color:#10b981; font-weight:bold;">+${currency}${Math.round(diff).toLocaleString()}</span>`;
+                } else if (diff < 0) {
+                    winnerBadge = '<span style="color:#38bdf8; font-weight:bold;">📊 DCA 獲勝</span>';
+                    diffHtml = `<span style="color:#f43f5e; font-weight:bold;">-${currency}${Math.round(Math.abs(diff)).toLocaleString()}</span>`;
+                }
+            } else {
+                winnerBadge = bestStrat.type;
+            }
+
+            rowsHtml += `
+                <tr>
+                    <td><strong>${stock.name}</strong> <small style="color:#94a3b8">(${stock.code})</small></td>
+                    <td>${winnerBadge}</td>
+                    <td>${diffHtml}</td>
+                    <td>${dcaStrat ? `${currency}${Math.round(dcaStrat.final_value).toLocaleString()} (${dcaStrat.total_return_pct.toFixed(1)}%)` : '-'}</td>
+                    <td>${fgiStrat ? `${currency}${Math.round(fgiStrat.final_value).toLocaleString()} (${fgiStrat.total_return_pct.toFixed(1)}%)` : '-'}</td>
+                    <td>${fgiStrat ? `<span style="color:var(--accent); font-weight:600;">${fgiStrat.params}</span>` : '-'}</td>
+                </tr>
+            `;
+        });
+
+        container.innerHTML = `
+            <div class="leaderboard-card">
+                <h3 style="margin-top:0; color:var(--gold); display:flex; align-items:center; gap:8px;">
+                    🏆 綜合回測天梯榜 (跨標的策略戰報)
+                </h3>
+                <table class="leaderboard-table">
+                    <thead>
+                        <tr>
+                            <th>標的</th>
+                            <th>最佳策略</th>
+                            <th>FGI 超額獲利差</th>
+                            <th>DCA 最終資產 (報酬率)</th>
+                            <th>FGI 最終資產 (報酬率)</th>
+                            <th>FGI 參數</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rowsHtml}</tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    function renderStockCards(data, currency) {
+        const container = document.getElementById('resultsArea');
+        container.innerHTML = '';
+
+        data.forEach((stock, sIdx) => {
+            const card = document.createElement('div');
+            card.className = 'stock-card';
+
+            const bestStrat = stock.strategies.reduce((prev, curr) => (prev.final_value > curr.final_value) ? prev : curr);
+
+            let statsHtml = '';
+            stock.strategies.forEach(strat => {
+                const isWinner = strat === bestStrat && stock.strategies.length > 1;
+                const logKey = `${stock.code}_${strat.type}`;
+                globalTradeLogs[logKey] = {
+                    stockName: stock.name,
+                    stockCode: stock.code,
+                    stratType: strat.type,
+                    currency: currency,
+                    trades: strat.trades,
+                    totalFees: strat.total_fees,
+                    totalTaxes: strat.total_taxes
+                };
+
+                const profitColor = strat.net_profit >= 0 ? 'var(--success)' : 'var(--danger)';
+                const profitSign = strat.net_profit >= 0 ? '+' : '';
+
+                statsHtml += `
+                    <div class="stat-box ${isWinner ? 'winner' : ''}">
+                        ${isWinner ? '<span class="winner-tag">👑 績效冠軍</span>' : ''}
+                        <div class="stat-strat-title">${strat.type}</div>
+                        <div class="stat-main-value" style="color: ${profitColor};">
+                            ${currency} ${Math.round(strat.final_value).toLocaleString()}
+                        </div>
+                        <div class="stat-row">
+                            <span>總投入本金:</span>
+                            <strong>${currency} ${Math.round(strat.total_cost).toLocaleString()}</strong>
+                        </div>
+                        <div class="stat-row">
+                            <span>淨獲利金額:</span>
+                            <strong style="color:${profitColor}">${profitSign}${currency} ${Math.round(strat.net_profit).toLocaleString()}</strong>
+                        </div>
+                        <div class="stat-row">
+                            <span>累積總報酬率:</span>
+                            <strong style="color:${profitColor}">${profitSign}${strat.total_return_pct.toFixed(2)}%</strong>
+                        </div>
+                        <div class="stat-row">
+                            <span>年化報酬 (CAGR):</span>
+                            <strong>${strat.cagr.toFixed(2)}%</strong>
+                        </div>
+                        <div class="stat-row">
+                            <span>最大回撤 (MDD):</span>
+                            <strong style="color:#f43f5e;">${strat.mdd.toFixed(2)}%</strong>
+                        </div>
+                        <div class="stat-row">
+                            <span>交易次數 / 勝率:</span>
+                            <strong>${strat.trades_count} 次 (${strat.win_rate.toFixed(0)}%)</strong>
+                        </div>
+                        <div class="stat-row">
+                            <span>摩擦成本 (手續費+稅):</span>
+                            <span>${currency} ${Math.round(strat.total_fees + strat.total_taxes).toLocaleString()}</span>
+                        </div>
+                        ${strat.params && strat.params !== '每月定期定額' ? `<div style="font-size:0.8rem; color:var(--accent); margin-top:8px;">參數設定: ${strat.params}</div>` : ''}
+
+                        <button class="btn-details" onclick="openModal('${logKey}')">📜 檢視詳細交易日誌 (${strat.trades_count})</button>
+                    </div>
+                `;
+            });
+
+            card.innerHTML = `
+                <div class="card-header">
+                    <div class="card-title">
+                        <span>${stock.name}</span>
+                        <span style="font-size:0.9rem; color:var(--text-muted); font-weight:normal;">[${stock.code}]</span>
+                    </div>
+                    <div style="font-size:0.85rem; color:var(--text-muted);">
+                        區間: ${stock.date_range.start} ~ ${stock.date_range.end} (${stock.date_range.trading_days} 交易日)
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="stats-grid">${statsHtml}</div>
+                    <div class="chart-wrapper">
+                        <canvas id="chart_${sIdx}"></canvas>
+                    </div>
+                </div>
+            `;
+            container.appendChild(card);
+
+            renderInteractiveChart(`chart_${sIdx}`, stock.strategies, currency);
+        });
+    }
+
+    function renderInteractiveChart(canvasId, strategies, currency) {
+        const ctx = document.getElementById(canvasId).getContext('2d');
+        const labels = strategies[0].history.map(h => h.date);
+
+        const colors = [
+            { border: '#38bdf8', bg: 'rgba(56, 189, 248, 0.1)' },
+            { border: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' },
+            { border: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' }
+        ];
+
+        const datasets = [];
+
+        // 加入各策略曲線
+        strategies.forEach((strat, i) => {
+            const c = colors[i % colors.length];
+            datasets.push({
+                label: strat.type,
+                data: strat.history.map(h => h.value),
+                borderColor: c.border,
+                borderWidth: 2.2,
+                pointRadius: 0,
+                tension: 0.1
+            });
+        });
+
+        // 加入「投入本金成本線」作為對比
+        datasets.push({
+            label: '累計投入本金 (Cost)',
+            data: strategies[0].history.map(h => h.cost),
+            borderColor: '#64748b',
+            borderWidth: 1.5,
+            borderDash: [5, 5],
+            pointRadius: 0,
+            tension: 0.1
+        });
+
+        new Chart(ctx, {
+            type: 'line',
+            data: { labels, datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: {
+                        labels: { color: '#e2e8f0', font: { size: 12 } }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) label += ': ';
+                                if (context.parsed.y !== null) {
+                                    label += currency + ' ' + Math.round(context.parsed.y).toLocaleString();
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { color: '#94a3b8', maxTicksLimit: 12 },
+                        grid: { color: 'rgba(51, 65, 85, 0.4)' }
+                    },
+                    y: {
+                        ticks: {
+                            color: '#94a3b8',
+                            callback: function(value) {
+                                return currency + ' ' + (value >= 1000000 ? (value/1000000).toFixed(1) + 'M' : (value/1000).toFixed(0) + 'K');
+                            }
+                        },
+                        grid: { color: 'rgba(51, 65, 85, 0.4)' }
+                    }
+                }
+            }
+        });
+    }
+
+    // 彈窗交易明細管理
+    function openModal(logKey) {
+        currentModalLogKey = logKey;
+        currentFilterType = 'all';
+        const logData = globalTradeLogs[logKey];
+        if (!logData) return;
+
+        document.getElementById('modalTitle').innerText = `📜 ${logData.stockName} (${logData.stockCode}) - ${logData.stratType} 交易日誌`;
+        
+        const frictionTotal = (logData.totalFees + logData.totalTaxes).toFixed(0);
+        document.getElementById('modalSummary').innerHTML = `
+            <span>總繳手續費: <strong>${logData.currency} ${Math.round(logData.totalFees).toLocaleString()}</strong></span> | 
+            <span>總繳交易稅: <strong>${logData.currency} ${Math.round(logData.totalTaxes).toLocaleString()}</strong></span> | 
+            <span style="color:#f43f5e;">總計摩擦成本: <strong>${logData.currency} ${Math.round(frictionTotal).toLocaleString()}</strong></span>
+        `;
+
+        renderModalTable();
+        document.getElementById('tradeModal').style.display = 'block';
+    }
+
+    function filterModalTrades(type) {
+        currentFilterType = type;
+        document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+        event.target.classList.add('active');
+        renderModalTable();
+    }
+
+    function renderModalTable() {
+        const logData = globalTradeLogs[currentModalLogKey];
+        if (!logData) return;
+
+        let trades = logData.trades || [];
+        if (currentFilterType === 'buy') {
+            trades = trades.filter(t => t.action.includes('買'));
+        } else if (currentFilterType === 'sell') {
+            trades = trades.filter(t => t.action.includes('賣') || t.action.includes('清倉'));
+        }
+
+        if (trades.length === 0) {
+            document.getElementById('modalBody').innerHTML = `<p style="text-align:center; padding:30px; color:#94a3b8;">無符合條件之交易紀錄</p>`;
+            return;
+        }
+
+        let rowsHtml = trades.map(t => {
+            const isSell = t.action.includes('賣') || t.action.includes('清倉');
+            const actionColor = isSell ? 'color:var(--danger);' : 'color:var(--success);';
+            return `
+                <tr>
+                    <td>${t.date}</td>
+                    <td style="${actionColor} font-weight:700;">${t.action}</td>
+                    <td>${t.price.toFixed(2)}</td>
+                    <td>${t.shares.toFixed(2)}</td>
+                    <td>${logData.currency} ${Math.round(t.amount).toLocaleString()}</td>
+                    <td>${t.fee.toFixed(1)}</td>
+                    <td>${t.tax.toFixed(1)}</td>
+                </tr>
+            `;
+        }).join('');
+
+        document.getElementById('modalBody').innerHTML = `
+            <table class="trades-table">
+                <thead>
+                    <tr>
+                        <th>交易日期</th>
+                        <th>操作動作</th>
+                        <th>成交單價</th>
+                        <th>成交股數</th>
+                        <th>交易總金額</th>
+                        <th>手續費</th>
+                        <th>交易稅</th>
+                    </tr>
+                </thead>
+                <tbody>${rowsHtml}</tbody>
+            </table>
+        `;
+    }
+
+    function exportTradesToCSV() {
+        const logData = globalTradeLogs[currentModalLogKey];
+        if (!logData || !logData.trades || logData.trades.length === 0) {
+            alert('無交易紀錄可匯出');
+            return;
+        }
+
+        const headers = ["日期", "操作動作", "成交單價", "成交股數", "交易總金額", "手續費", "交易稅"];
+        const rows = logData.trades.map(t => [
+            t.date,
+            t.action,
+            t.price,
+            t.shares,
+            t.amount,
+            t.fee,
+            t.tax
+        ]);
+
+        const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${logData.stockCode}_${logData.stratType}_trades.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    function closeModal() {
+        document.getElementById('tradeModal').style.display = 'none';
+    }
+    window.onclick = function(e) {
+        if (e.target === document.getElementById('tradeModal')) closeModal();
+    };
+</script>
+
+</body>
+</html>
